@@ -2,7 +2,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
 const client = new MongoClient(process.env.MONGODB_URI);
-const ADMIN_WHITELIST = ["u_vhsncg24za, u_5arrqdokoc"]; 
+const ADMIN_WHITELIST = ["u_vhsncg24za"]; 
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
