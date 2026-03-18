@@ -2,8 +2,30 @@ import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
 const client = new MongoClient(process.env.MONGODB_URI);
-// ADD YOUR UID HERE TO BE ADMIN AUTOMATICALLY
-const ADMIN_WHITELIST = ["admin_master_77", "u_your_id_here"]; 
+const ADMIN_WHITELIST = ["u_your_id_here"]; // Put your ID from Account Center here!
+
+export async function GET(req) {
+  const { searchParams } = new URL(req.url);
+  const type = searchParams.get("type"); // Check if we want servers or messages
+  
+  try {
+    await client.connect();
+    const db = client.db("chatdb");
+
+    if (type === "servers") {
+      const collections = await db.listCollections().toArray();
+      // Filter out system collections
+      const servers = collections
+        .map(c => c.name)
+        .filter(n => n !== "blacklist" && n !== "users");
+      return NextResponse.json(servers);
+    }
+
+    const server = searchParams.get("server") || "general";
+    const msgs = await db.collection(server).find().sort({ date: -1 }).limit(50).toArray();
+    return NextResponse.json(msgs.map(({ uid, ...rest }) => rest));
+  } catch (e) { return NextResponse.json([]); }
+}
 
 export async function POST(req) {
   try {
@@ -11,51 +33,33 @@ export async function POST(req) {
     await client.connect();
     const db = client.db("chatdb");
 
-    const banned = await db.collection("blacklist").findOne({ uid: body.uid });
-    if (banned) return NextResponse.json({ error: "Banned" }, { status: 403 });
-
     const isAuthAdmin = ADMIN_WHITELIST.includes(body.uid);
 
-    if (body.adminAction) {
-      if (!isAuthAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // ACTION: Create Server
+    if (body.action === "create_server") {
+      if (!isAuthAdmin) return NextResponse.json({ error: "No" }, { status: 401 });
+      const newName = body.serverName.toLowerCase().replace(/\s+/g, '-');
+      await db.createCollection(newName);
+      return NextResponse.json({ success: true });
+    }
+
+    // ACTION: Admin Tools
+    if (body.adminAction && isAuthAdmin) {
       if (body.action === "ban") {
-        await db.collection("blacklist").updateOne({ username: body.target }, { $set: { username: body.target, uid: body.targetUid } }, { upsert: true });
-      } else if (body.action === "unban") {
+        await db.collection("blacklist").updateOne({ username: body.target }, { $set: { uid: body.targetUid } }, { upsert: true });
+      } else {
         await db.collection("blacklist").deleteOne({ username: body.target });
       }
       return NextResponse.json({ success: true });
     }
 
-    // FALLBACK: If pfp is missing or broken, use a default robot avatar
-    const safePfp = body.pfp && body.pfp.startsWith("data:image") 
-      ? body.pfp 
-      : `https://api.dicebear.com/7.x/bottts/svg?seed=${body.user}`;
-
+    // Regular Message
+    const safePfp = body.pfp || `https://api.dicebear.com/7.x/bottts/svg?seed=${body.user}`;
     await db.collection(body.server || "general").insertOne({
-      text: body.text,
-      user: body.user,
-      isAdmin: isAuthAdmin,
-      pfp: safePfp,
-      image: body.image,
-      uid: body.uid,
-      date: new Date()
+      text: body.text, user: body.user, isAdmin: isAuthAdmin,
+      pfp: safePfp, image: body.image, uid: body.uid, date: new Date()
     });
 
     return NextResponse.json({ success: true });
-  } catch (e) {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
-  }
-}
-
-export async function GET(req) {
-  const { searchParams } = new URL(req.url);
-  const server = searchParams.get("server") || "general";
-  try {
-    await client.connect();
-    const db = client.db("chatdb");
-    const msgs = await db.collection(server).find().sort({ date: -1 }).limit(50).toArray();
-    // Remove UIDs from the public feed for security
-    const safeMsgs = msgs.map(({ uid, ...rest }) => rest);
-    return NextResponse.json(safeMsgs);
-  } catch (e) { return NextResponse.json([]); }
+  } catch (e) { return NextResponse.json({ error: e.message }, { status: 500 }); }
 }
