@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 const client = new MongoClient(process.env.MONGODB_URI);
 
 // PASTE YOUR ID FROM SETTINGS HERE
-const ADMIN_WHITELIST = ["u_your_id_here"]; 
+const ADMIN_WHITELIST = ["u_mepenrgrqk"]; 
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
