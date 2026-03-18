@@ -12,9 +12,7 @@ export async function GET(req) {
     const db = client.db("chatdb");
     const msgs = await db.collection(server).find().sort({ date: -1 }).limit(50).toArray();
     return NextResponse.json(msgs);
-  } catch (e) { 
-    return NextResponse.json([]); 
-  }
+  } catch (e) { return NextResponse.json([]); }
 }
 
 export async function POST(req) {
@@ -23,34 +21,25 @@ export async function POST(req) {
     await client.connect();
     const db = client.db("chatdb");
 
-    // Check for Ban
+    // Block banned users
     const banned = await db.collection("blacklist").findOne({ username: body.user });
     if (banned) return NextResponse.json({ error: "Banned" }, { status: 403 });
 
-    // Handle Admin Actions (Ban/Unban)
+    // Admin Actions
     if (body.adminAction && body.pass === MASTER_PASS) {
       if (body.action === "ban") {
         await db.collection("blacklist").updateOne({ username: body.target }, { $set: { username: body.target } }, { upsert: true });
-      } else {
+      } else if (body.action === "unban") {
         await db.collection("blacklist").deleteOne({ username: body.target });
       }
       return NextResponse.json({ success: true });
     }
 
-    // Save Message
     await db.collection(body.server || "general").insertOne({
-      text: body.text || "",
-      user: body.user || "Unknown",
-      isAdmin: Boolean(body.isAdmin),
-      pfp: body.pfp || "",
-      image: body.image || null,
-      date: new Date()
+      ...body, date: new Date()
     });
-
     return NextResponse.json({ success: true });
-  } catch (e) {
-    return NextResponse.json({ error: "Server Error" }, { status: 500 });
-  }
+  } catch (e) { return NextResponse.json({ error: "Error" }, { status: 500 }); }
 }
 
 export async function DELETE(req) {
