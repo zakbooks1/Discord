@@ -2,34 +2,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
 const client = new MongoClient(process.env.MONGODB_URI);
-
-// 1. ADD YOUR ID HERE FROM SETTINGS
-const ADMIN_WHITELIST = ["u_vhsncg24za"]; 
-
-export async function GET(req) {
-  const { searchParams } = new URL(req.url);
-  const type = searchParams.get("type");
-  try {
-    await client.connect();
-    const db = client.db("chatdb");
-
-    if (type === "servers") {
-      const cols = await db.listCollections().toArray();
-      const servers = cols.map(c => c.name).filter(n => !["blacklist", "users"].includes(n));
-      if (!servers.includes("general")) servers.push("general");
-      return NextResponse.json(servers);
-    }
-
-    const server = searchParams.get("server") || "general";
-    const msgs = await db.collection(server).find().sort({ date: -1 }).limit(50).toArray();
-    
-    // Server-side Admin Check: If their UID is in our list, they get the crown
-    return NextResponse.json(msgs.map(({ uid, ...rest }) => ({
-      ...rest,
-      isAdmin: ADMIN_WHITELIST.includes(uid)
-    })));
-  } catch (e) { return NextResponse.json(["general"]); }
-}
+const ADMIN_WHITELIST = ["u_vhsncg24za"]; // REQUIRED: Put your ID here!
 
 export async function POST(req) {
   try {
@@ -37,26 +10,32 @@ export async function POST(req) {
     await client.connect();
     const db = client.db("chatdb");
 
+    // 1. GLOBAL BAN CHECK: Stop banned UIDs from posting
+    const isBanned = await db.collection("blacklist").findOne({ uid: body.uid });
+    if (isBanned) return NextResponse.json({ error: "Banned" }, { status: 403 });
+
     const isAuthAdmin = ADMIN_WHITELIST.includes(body.uid);
 
-    // Create Server Command
-    if (body.action === "create_server" && isAuthAdmin) {
-      const name = body.name.toLowerCase().replace(/\s+/g, '-');
-      await db.createCollection(name);
-      return NextResponse.json({ success: true });
-    }
-
-    // Admin Commands (Ban/Clear)
+    // 2. ADMIN COMMAND LOGIC
     if (body.adminAction && isAuthAdmin) {
-      if (body.action === "clear") {
+      if (body.action === "ban") {
+        // Adds the target UID to the blacklist collection
+        await db.collection("blacklist").updateOne(
+          { uid: body.targetUid }, 
+          { $set: { uid: body.targetUid, reason: "Banned by Admin" } }, 
+          { upsert: true }
+        );
+      } 
+      else if (body.action === "unban") {
+        await db.collection("blacklist").deleteOne({ uid: body.targetUid });
+      } 
+      else if (body.action === "clear") {
         await db.collection(body.server).deleteMany({});
-      } else if (body.action === "ban") {
-        await db.collection("blacklist").insertOne({ targetUid: body.targetUid });
       }
       return NextResponse.json({ success: true });
     }
 
-    // Standard Message
+    // 3. REGULAR MESSAGE SAVE
     await db.collection(body.server || "general").insertOne({
       text: body.text, user: body.user, pfp: body.pfp, 
       image: body.image, uid: body.uid, date: new Date()
@@ -64,4 +43,22 @@ export async function POST(req) {
 
     return NextResponse.json({ success: true });
   } catch (e) { return NextResponse.json({ error: "Fail" }, { status: 500 }); }
+}
+
+export async function GET(req) {
+  const { searchParams } = new URL(req.url);
+  const type = searchParams.get("type");
+  try {
+    await client.connect();
+    const db = client.db("chatdb");
+    if (type === "servers") {
+      const cols = await db.listCollections().toArray();
+      const servers = cols.map(c => c.name).filter(n => !["blacklist", "users"].includes(n));
+      if (!servers.includes("general")) servers.push("general");
+      return NextResponse.json(servers);
+    }
+    const server = searchParams.get("server") || "general";
+    const msgs = await db.collection(server).find().sort({ date: -1 }).limit(50).toArray();
+    return NextResponse.json(msgs.map(m => ({ ...m, isAdmin: ADMIN_WHITELIST.includes(m.uid) })));
+  } catch (e) { return NextResponse.json(["general"]); }
 }
