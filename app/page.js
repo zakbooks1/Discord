@@ -4,97 +4,108 @@ import { useEffect, useState, useRef } from "react";
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
-  const [username, setUsername] = useState("");
+  const [user, setUser] = useState({ name: "", isAdmin: false, pass: "" });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  
+  // Login Inputs
+  const [tempName, setTempName] = useState("");
+  const [tempPass, setTempPass] = useState("");
+
   const scrollRef = useRef(null);
 
-  const loadData = async () => {
-    try {
-      const res = await fetch("/api/messages");
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        // We reverse them here so the newest are at the bottom for the chat feel
-        setMessages(data.reverse());
-      }
-    } catch (e) { console.log("Load error"); }
-  };
-
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const saved = localStorage.getItem("chat-user");
+    if (saved) {
+      setUser(JSON.parse(saved));
+      setIsLoggedIn(true);
     }
-  }, [messages]);
-
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 3000);
-    return () => clearInterval(interval);
   }, []);
 
-  const send = async () => {
-    if (!text || !username) return;
+  const handleLogin = () => {
+    if (!tempName) return alert("Enter a name");
+    const userData = { 
+      name: tempName, 
+      isAdmin: tempPass === "your_secret_admin_pass", // Same as backend
+      pass: tempPass 
+    };
+    setUser(userData);
+    setIsLoggedIn(true);
+    localStorage.setItem("chat-user", JSON.stringify(userData));
+  };
 
-    const response = await fetch("/api/messages", {
+  const loadData = async () => {
+    const res = await fetch("/api/messages");
+    const data = await res.json();
+    if (Array.isArray(data)) setMessages(data.reverse());
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadData();
+      const interval = setInterval(loadData, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn]);
+
+  const send = async () => {
+    if (!text) return;
+    await fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, user: username }),
+      body: JSON.stringify({ text, user: user.name, isAdmin: user.isAdmin }),
     });
-
-    if (response.ok) {
-      setText("");
-      loadData();
-    }
+    setText("");
+    loadData();
   };
+
+  const deleteMsg = async (id) => {
+    await fetch("/api/messages", {
+      method: "DELETE",
+      headers: { "admin-pass": user.pass },
+      body: JSON.stringify({ id }),
+    });
+    loadData();
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <div style={styles.loginOverlay}>
+        <div style={styles.loginBox}>
+          <h3>Welcome Back!</h3>
+          <input placeholder="Username" onChange={e => setTempName(e.target.value)} style={styles.loginInput} />
+          <input placeholder="Admin Password (Optional)" type="password" onChange={e => setTempPass(e.target.value)} style={styles.loginInput} />
+          <button onClick={handleLogin} style={styles.loginBtn}>Login</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
-      {/* Sidebar - Discord Style */}
-      <div style={styles.sidebar}>
-        <div style={styles.serverIcon}>M</div>
-        <div style={styles.divider} />
-        <div style={styles.statusDot} />
-      </div>
-
-      {/* Main Chat Area */}
       <div style={styles.chatArea}>
-        <div style={styles.header}>
-          <span style={styles.hashtag}>#</span> general-chat
-        </div>
-
+        <div style={styles.header}># general-chat {user.isAdmin && "(ADMIN)"}</div>
         <div style={styles.messageList} ref={scrollRef}>
           {messages.map((m, i) => (
             <div key={i} style={styles.messageRow}>
-              <div style={styles.avatar}>
-                {m.user ? m.user[0].toUpperCase() : "?"}
-              </div>
-              <div style={styles.messageContent}>
-                <div style={styles.messageHeader}>
-                  <span style={styles.username}>{m.user}</span>
-                  <span style={styles.timestamp}>Today at {new Date(m.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                </div>
+              <div style={styles.avatar}>{m.user?.[0]}</div>
+              <div style={{ flex: 1 }}>
+                <span style={styles.username}>{m.user} {m.isAdmin && "🛡️"}</span>
                 <div style={styles.messageText}>{m.text}</div>
               </div>
+              {user.isAdmin && (
+                <button onClick={() => deleteMsg(m._id)} style={styles.deleteBtn}>Delete</button>
+              )}
             </div>
           ))}
         </div>
-
-        {/* Input Area */}
-        <div style={styles.inputContainer}>
+        <div style={styles.inputWrapper}>
           <input 
-            placeholder="Set Username first..."
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            style={styles.usernameInput}
+            value={text} 
+            onChange={e => setText(e.target.value)} 
+            onKeyDown={e => e.key === "Enter" && send()}
+            style={styles.mainInput} 
+            placeholder="Type a message..."
           />
-          <div style={styles.inputWrapper}>
-            <input 
-              placeholder={`Message #general-chat`}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && send()}
-              style={styles.mainInput}
-            />
-          </div>
         </div>
       </div>
     </div>
@@ -102,140 +113,19 @@ export default function Home() {
 }
 
 const styles = {
-  container: {
-    display: "flex",
-    height: "100vh",
-    backgroundColor: "#313338",
-    color: "#dbdee1",
-    fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  },
-  sidebar: {
-    width: "72px",
-    backgroundColor: "#1e1f22",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    paddingTop: "12px",
-    gap: "8px",
-  },
-  serverIcon: {
-    width: "48px",
-    height: "48px",
-    backgroundColor: "#5865f2",
-    borderRadius: "16px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "white",
-    fontWeight: "bold",
-    fontSize: "20px",
-  },
-  divider: {
-    width: "32px",
-    height: "2px",
-    backgroundColor: "#35363c",
-    margin: "4px 0",
-  },
-  statusDot: {
-    width: "48px",
-    height: "48px",
-    backgroundColor: "#35363c",
-    borderRadius: "50%",
-  },
-  chatArea: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-  },
-  header: {
-    height: "48px",
-    display: "flex",
-    alignItems: "center",
-    padding: "0 16px",
-    fontWeight: "bold",
-    borderBottom: "1px solid #26272d",
-    boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
-  },
-  hashtag: {
-    color: "#80848e",
-    fontSize: "24px",
-    marginRight: "8px",
-    fontWeight: "normal",
-  },
-  messageList: {
-    flex: 1,
-    overflowY: "auto",
-    padding: "16px 0",
-    display: "flex",
-    flexDirection: "column",
-  },
-  messageRow: {
-    display: "flex",
-    padding: "8px 16px",
-    gap: "16px",
-    transition: "background 0.1s",
-  },
-  avatar: {
-    width: "40px",
-    height: "40px",
-    backgroundColor: "#eb459e",
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "white",
-    fontWeight: "bold",
-    flexShrink: 0,
-  },
-  messageContent: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  messageHeader: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: "8px",
-  },
-  username: {
-    fontWeight: "600",
-    color: "#f2f3f5",
-    fontSize: "16px",
-  },
-  timestamp: {
-    fontSize: "12px",
-    color: "#949ba4",
-  },
-  messageText: {
-    color: "#dbdee1",
-    lineHeight: "1.375rem",
-    marginTop: "2px",
-  },
-  inputContainer: {
-    padding: "0 16px 24px 16px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  usernameInput: {
-    width: "150px",
-    background: "#1e1f22",
-    border: "none",
-    borderRadius: "4px",
-    padding: "4px 8px",
-    color: "#dbdee1",
-    fontSize: "12px",
-  },
-  inputWrapper: {
-    backgroundColor: "#383a40",
-    borderRadius: "8px",
-    padding: "11px 16px",
-  },
-  mainInput: {
-    width: "100%",
-    background: "transparent",
-    border: "none",
-    outline: "none",
-    color: "#dbdee1",
-    fontSize: "16px",
-  }
+  container: { display: "flex", height: "100vh", backgroundColor: "#313338", color: "#dbdee1" },
+  loginOverlay: { display: "flex", height: "100vh", justifyContent: "center", alignItems: "center", backgroundColor: "#1e1f22" },
+  loginBox: { backgroundColor: "#313338", padding: "40px", borderRadius: "8px", display: "flex", flexDirection: "column", gap: "10px", width: "300px" },
+  loginInput: { padding: "10px", borderRadius: "4px", border: "none", backgroundColor: "#1e1f22", color: "white" },
+  loginBtn: { padding: "10px", backgroundColor: "#5865f2", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" },
+  chatArea: { flex: 1, display: "flex", flexDirection: "column" },
+  header: { height: "48px", padding: "0 16px", display: "flex", alignItems: "center", borderBottom: "1px solid #26272d", fontWeight: "bold" },
+  messageList: { flex: 1, overflowY: "auto", padding: "20px" },
+  messageRow: { display: "flex", gap: "15px", marginBottom: "20px", alignItems: "center" },
+  avatar: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "#5865f2", display: "flex", justifyContent: "center", alignItems: "center" },
+  username: { fontWeight: "bold", fontSize: "14px" },
+  messageText: { marginTop: "4px" },
+  inputWrapper: { padding: "20px", backgroundColor: "#313338" },
+  mainInput: { width: "100%", padding: "12px", borderRadius: "8px", border: "none", backgroundColor: "#383a40", color: "white", outline: "none" },
+  deleteBtn: { backgroundColor: "transparent", color: "#ff4747", border: "1px solid #ff4747", borderRadius: "4px", padding: "2px 8px", cursor: "pointer", fontSize: "10px" }
 };
