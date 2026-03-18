@@ -1,4 +1,18 @@
-"use client";
+const ADMIN_PASS = "67man"; // Make sure this is exactly what you type!
+
+const handleLogin = () => {
+  if (!tempName) return alert("Enter a name");
+  
+  // LOGIC CHECK:
+  const isAdm = tempPass === ADMIN_PASS; 
+  
+  const userData = { 
+    name: tempName, 
+    isAdmin: isAdm, // If this is false, admin won't work
+    pass: tempPass 
+  };
+  // ... rest of code 
+  "use client";
 import { useEffect, useState, useRef } from "react";
 
 export default function Home() {
