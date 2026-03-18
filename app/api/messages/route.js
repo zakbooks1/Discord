@@ -2,7 +2,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
 const client = new MongoClient(process.env.MONGODB_URI);
-const MASTER_PASS = "67bits"; // The "Source of Truth"
+const MASTER_PASS = "67bits67"; // The "Source of Truth"
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
