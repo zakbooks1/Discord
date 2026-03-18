@@ -20,9 +20,21 @@ export default function Home() {
   const channels = [{ id: "general", icon: "#" }, { id: "media", icon: "📸" }];
 
   useEffect(() => {
-    const saved = localStorage.getItem("chat-v9-final");
-    if (saved) { setUser(JSON.parse(saved)); setIsLoggedIn(true); }
-  }, []);
+    if (isLoggedIn) {
+      // Temporary: Add a fake message to see if the screen works
+      setMessages([{
+        user: "System",
+        text: "If you can see this, the screen is working. Still loading database...",
+        pfp: "https://api.dicebear.com/7.x/bottts/svg?seed=system",
+        isAdmin: true,
+        date: new Date()
+      }]);
+      
+      loadData();
+      const interval = setInterval(loadData, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn, activeServer]);
 
   const handleLogin = () => {
     if (!tempName) return alert("Enter name");
