@@ -11,12 +11,13 @@ export default function Home() {
   const [tempPass, setTempPass] = useState("");
   const scrollRef = useRef(null);
 
-  const APP_ADMIN_PASS = "admin123"; // MUST match the backend
+  const APP_ADMIN_PASS = "67bits"; // MUST match the backend
 
   const servers = [
     { id: "general", name: "G", color: "#5865f2" },
     { id: "gaming", name: "🎮", color: "#3ba55c" },
     { id: "coding", name: "💻", color: "#eb459e" }
+    { id: "the67s", name: "😋", color: "#fffff" }
   ];
 
   useEffect(() => {
