@@ -6,7 +6,7 @@ const client = new MongoClient(process.env.MONGODB_URI);
 // --- CONFIGURATION ---
 // 1. Get your ID from the Gear icon in the app
 // 2. Paste it here to unlock Crown + Commands
-const ADMIN_WHITELIST = ["u_vhsncg24za"]; 
+const ADMIN_WHITELIST = ["u_r0z2rcgu"]; 
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
