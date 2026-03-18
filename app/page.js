@@ -6,86 +6,67 @@ export default function Home() {
   const [text, setText] = useState("");
   const [username, setUsername] = useState("");
 
-  // 1. The function that fetches data
   const loadData = async () => {
     try {
       const res = await fetch("/api/messages");
       const data = await res.json();
-      if (Array.isArray(data)) {
-        // Only update state if the data actually changed to prevent flickering
-        setMessages(data);
-      }
-    } catch (e) {
-      console.error("Failed to load messages");
-    }
+      if (Array.isArray(data)) setMessages(data);
+    } catch (e) { console.log("Load error"); }
   };
 
-  // 2. The Auto-Refresh Logic
   useEffect(() => {
-    loadData(); // Load immediately on page load
-
-    // Check for new messages every 3 seconds (3000ms)
-    const interval = setInterval(() => {
-      loadData();
-    }, 3000);
-
-    // Cleanup: Stops the timer if the user leaves the page
+    loadData();
+    const interval = setInterval(loadData, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  // 3. Send Message
   const send = async () => {
-    if (!text || !username) return alert("Enter a username and message!");
-    
-    const res = await fetch("/api/messages", {
+    if (!text || !username) return alert("Fill in Username and Message!");
+
+    const response = await fetch("/api/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, user: username }),
+      headers: { "Content-Type": "application/json" }, // CRITICAL LINE
+      body: JSON.stringify({ 
+        text: text, 
+        user: username // Sends the username state
+      }),
     });
 
-    if (res.ok) {
+    if (response.ok) {
       setText("");
-      loadData(); // Refresh immediately after sending
+      loadData();
     }
   };
 
   return (
-    <div style={{ padding: 20, background: "#111", color: "white", minHeight: "100vh", fontFamily: "sans-serif" }}>
-      <h2>Chat Auto-Refresh: ON</h2>
+    <div style={{ padding: "20px", background: "#111", color: "white", minHeight: "100vh" }}>
+      <h2>Discord Clone (MongoDB)</h2>
       
       <input 
-        value={username} 
-        onChange={(e) => setUsername(e.target.value)} 
-        style={{ padding: 10, borderRadius: 5, marginBottom: 10, width: "200px", border: "1px solid #444" }}
-        placeholder="Your Username"
+        placeholder="Username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        style={{ padding: "10px", marginBottom: "10px", borderRadius: "5px", width: "200px" }}
       />
 
-      <div style={{ 
-        margin: "20px 0", 
-        height: "400px", 
-        overflowY: "auto", 
-        background: "#1a1a1a", 
-        padding: "15px", 
-        borderRadius: "10px" 
-      }}>
+      <div style={{ height: "300px", overflowY: "auto", background: "#222", padding: "10px", borderRadius: "10px" }}>
         {messages.map((m, i) => (
-          <div key={m._id || i} style={{ background: "#222", padding: "10px", marginBottom: 8, borderRadius: 8 }}>
-            <strong style={{ color: "#0070f3" }}>{m.user || "Guest"}:</strong> {m.text}
+          <div key={i} style={{ marginBottom: "10px", borderBottom: "1px solid #333", paddingBottom: "5px" }}>
+            <span style={{ color: "#0070f3", fontWeight: "bold" }}>{m.user}: </span>
+            <span>{m.text}</span>
           </div>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: "10px" }}>
+      <div style={{ marginTop: "10px" }}>
         <input 
-          value={text} 
-          onChange={(e) => setText(e.target.value)} 
+          placeholder="Message"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
-          style={{ flex: 1, padding: 12, borderRadius: 5, border: "none", background: "#333", color: "white" }}
-          placeholder="Type a message..."
+          style={{ padding: "10px", width: "70%", borderRadius: "5px", color: "black" }}
         />
-        <button onClick={send} style={{ padding: "10px 20px", background: "#0070f3", color: "white", border: "none", borderRadius: 5, cursor: "pointer" }}>
-          Send
-        </button>
+        <button onClick={send} style={{ padding: "10px", marginLeft: "5px" }}>Send</button>
       </div>
     </div>
   );
