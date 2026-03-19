@@ -1,18 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
-import Login from "../components/Login";
-import { processCommand } from "../lib/cmds";
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [activeServer, setActiveServer] = useState("general");
   const [user, setUser] = useState(null);
+  const [creds, setCreds] = useState({ name: "", pass: "" });
   const [text, setText] = useState("");
-  const [suggestion, setSuggestion] = useState("");
 
   useEffect(() => {
-    const saved = localStorage.getItem("v_final_fixed");
-    if (saved) setUser(JSON.parse(saved));
+    // Clear the old 'undefined' data
+    const saved = localStorage.getItem("v_final");
+    if (saved && !saved.includes("undefined")) setUser(JSON.parse(saved));
   }, []);
 
   const sync = async () => {
@@ -24,59 +23,52 @@ export default function Home() {
 
   useEffect(() => { sync(); const i = setInterval(sync, 3000); return () => clearInterval(i); }, [user, activeServer]);
 
-  const send = async () => {
-    if (!text.trim()) return;
-    let body = { text, user: user.name, uid: user.uid, pfp: user.pfp, server: activeServer };
-    
-    const cmd = processCommand(text, user, activeServer);
-    if (cmd) {
-      if (cmd.type === "msg") body.text = cmd.text;
-      if (cmd.type === "admin") body = { ...body, ...cmd };
+  const handleLogin = async () => {
+    const res = await fetch("/api/messages", { method: "POST", body: JSON.stringify({ action: "auth", user: creds.name, password: creds.pass }) });
+    const data = await res.json();
+    if (data.success) {
+      setUser(data.user);
+      localStorage.setItem("v_final", JSON.stringify(data.user));
     }
-
-    await fetch("/api/messages", { method: "POST", body: JSON.stringify(body) });
-    setText(""); setSuggestion(""); sync();
   };
 
-  if (!user) return <Login onAuth={setUser} />;
+  if (!user) return (
+    <div style={{height:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#1e1f22', color:'white'}}>
+      <h2 style={{marginBottom:'20px'}}>Discord Clone Login</h2>
+      <input placeholder="Username" onChange={e => setCreds({...creds, name: e.target.value})} style={{padding:'10px', margin:'5px', width:'250px', borderRadius:'5px'}} />
+      <input type="password" placeholder="Password" onChange={e => setCreds({...creds, pass: e.target.value})} style={{padding:'10px', margin:'5px', width:'250px', borderRadius:'5px'}} />
+      <button onClick={handleLogin} style={{padding:'10px', width:'250px', background:'#5865f2', color:'white', border:'none', borderRadius:'5px', marginTop:'10px'}}>Sign In</button>
+    </div>
+  );
 
   return (
-    <div className="flex h-screen bg-[#313338] text-white">
-      {/* Sidebar logic... */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex-1 overflow-y-auto p-4">
+    <div style={{ display: "flex", height: "100vh", background: "#313338", color: "white", fontFamily: "sans-serif" }}>
+      {/* Sidebar */}
+      <div style={{ width: "72px", background: "#1e1f22", display: "flex", flexDirection: "column", gap: "10px", padding: "10px" }}>
+        {["general", "staff-room"].map(s => (
+          <div key={s} onClick={() => setActiveServer(s)} style={{ width: "48px", height: "48px", borderRadius: "50%", background: activeServer === s ? "#5865f2" : "#313338", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize:'10px' }}>{s.slice(0,2).toUpperCase()}</div>
+        ))}
+      </div>
+
+      {/* Main Chat */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <div style={{ height: "48px", borderBottom: "1px solid #232428", display: "flex", alignItems: "center", padding: "0 15px", fontWeight: "bold" }}># {activeServer}</div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
           {messages.map((m, i) => (
-            <div key={i} className={`flex gap-3 mb-4 ${m.isAnnounce ? 'bg-blue-500/10 p-2 border-l-4 border-blue-500' : ''}`}>
-              <img src={m.pfp} className="w-10 h-10 rounded-full" />
+            <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+              <img src={m.pfp} style={{ width: "40px", height: "40px", borderRadius: "50%" }} />
               <div>
-                <div className="font-bold flex items-center gap-2">
-                  <span style={{ color: m.isAdmin ? "#f1c40f" : "white" }}>{m.user}</span>
-                  {m.isAdmin && "👑"}
-                  {m.displayUid && <span className="text-[10px] text-gray-500 font-normal">ID: {m.displayUid}</span>}
+                <div style={{ fontWeight: "bold", color: m.isAdmin ? "#f1c40f" : "white" }}>
+                  {m.user} {m.isAdmin && "👑"}
+                  {m.displayUid && <span style={{fontSize:'10px', color:'gray', marginLeft:'10px'}}>ID: {m.displayUid}</span>}
                 </div>
-                <div className="text-[#dbdee1]">{m.text}</div>
+                <div>{m.text}</div>
               </div>
             </div>
           ))}
         </div>
-        <div className="p-4 relative">
-          {suggestion && (
-            <div className="absolute top-[-35px] left-6 bg-[#5865f2] px-3 py-1 rounded text-sm shadow-xl animate-pulse">
-              {suggestion}
-            </div>
-          )}
-          <input 
-            value={text} 
-            onChange={(e) => {
-              setText(e.target.value);
-              const list = ["/clear", "/announce", "/ban", "/shrug", "/dice"];
-              const match = list.find(c => c.startsWith(e.target.value));
-              setSuggestion(match && e.target.value.startsWith("/") ? `Use ${match}` : "");
-            }}
-            onKeyDown={(e) => e.key === "Enter" && send()}
-            className="w-full bg-[#383a40] p-3 rounded-lg outline-none"
-            placeholder={`Message #${activeServer}...`}
-          />
+        <div style={{ padding: "20px" }}>
+          <input onKeyDown={async e => { if (e.key === "Enter") { await fetch("/api/messages", { method: "POST", body: JSON.stringify({ text: e.target.value, user: user.name, uid: user.uid, pfp: user.pfp, server: activeServer }) }); e.target.value = ""; sync(); } }} style={{ width: "100%", padding: "12px", background: "#383a40", color: "white", border: "none", borderRadius: "8px" }} placeholder={`Message #${activeServer}...`} />
         </div>
       </div>
     </div>
