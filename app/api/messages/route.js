@@ -2,7 +2,7 @@ import { MongoClient } from "mongodb";
 import { NextResponse } from "next/server";
 
 const client = new MongoClient(process.env.MONGODB_URI);
-const ADMIN_WHITELIST = ["u_b9h0sogdf"]; // Put your ID here after logging in!
+const ADMIN_WHITELIST = ["u_3uqqpsixd"]; // Put your ID here after logging in!
 
 export async function POST(req) {
   try {
