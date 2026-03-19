@@ -8,11 +8,13 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [creds, setCreds] = useState({ name: "", pass: "" });
   const [text, setText] = useState("");
+  const [suggestion, setSuggestion] = useState("");
   const [showAcc, setShowAcc] = useState(false);
 
+  const CMDS = ["/ban", "/unban", "/clear", "/announce", "/nick", "/shrug", "/dice"];
+
   useEffect(() => {
-    // We use a new key 'v_final' to force a fresh login
-    const saved = localStorage.getItem("v_final");
+    const saved = localStorage.getItem("v_final_fixed");
     if (saved) setUser(JSON.parse(saved));
   }, []);
 
@@ -30,20 +32,29 @@ export default function Home() {
 
   useEffect(() => { sync(); const i = setInterval(sync, 3000); return () => clearInterval(i); }, [user, activeServer]);
 
-  const handleAuth = async () => {
-    const res = await fetch("/api/messages", { method: "POST", body: JSON.stringify({ action: "auth", user: creds.name, password: creds.pass }) });
-    const data = await res.json();
-    if (data.success) {
-      setUser(data.user);
-      localStorage.setItem("v_final", JSON.stringify(data.user));
-    } else { alert(data.error); }
+  const handleInput = (val) => {
+    setText(val);
+    if (val.startsWith("/")) {
+      const match = CMDS.find(c => c.startsWith(val.split(" ")[0]));
+      setSuggestion(match && match !== val ? `Did you mean ${match}?` : "");
+    } else { setSuggestion(""); }
   };
 
   const send = async () => {
     if (!text.trim()) return;
+    setSuggestion("");
     let body = { text, user: user.name, uid: user.uid, pfp: user.pfp, server: activeServer };
     
-    if (text === "/clear") { body.adminAction = true; body.action = "clear"; }
+    if (text.startsWith("/")) {
+      const args = text.split(" ");
+      const cmd = args[0].toLowerCase();
+      
+      if (cmd === "/clear") { body.adminAction = true; body.action = "clear"; }
+      if (cmd === "/announce") { body.adminAction = true; body.action = "announce"; body.text = args.slice(1).join(" "); }
+      if (cmd === "/ban") { body.adminAction = true; body.action = "ban"; body.targetUid = args[1]; }
+      if (cmd === "/shrug") body.text = "¯\\_(ツ)_/¯";
+      if (cmd === "/dice") body.text = `🎲 Rolled: ${Math.floor(Math.random()*6)+1}`;
+    }
 
     await fetch("/api/messages", { method: "POST", body: JSON.stringify(body) });
     setText(""); sync();
@@ -51,10 +62,10 @@ export default function Home() {
 
   if (!user) return (
     <div style={{height:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#1e1f22', color:'white'}}>
-      <h2 style={{marginBottom:'20px'}}>Secure Login</h2>
+      <h2 style={{marginBottom:'20px'}}>Discord Login</h2>
       <input placeholder="Username" onChange={e => setCreds({...creds, name: e.target.value})} style={{padding:'12px', margin:'5px', width:'250px', background:'#383a40', color:'white', border:'none', borderRadius:'5px'}} />
       <input type="password" placeholder="Password" onChange={e => setCreds({...creds, pass: e.target.value})} style={{padding:'12px', margin:'5px', width:'250px', background:'#383a40', color:'white', border:'none', borderRadius:'5px'}} />
-      <button onClick={handleAuth} style={{padding:'12px', width:'250px', marginTop:'10px', background:'#5865f2', color:'white', border:'none', borderRadius:'5px', cursor:'pointer'}}>Login / Register</button>
+      <button onClick={handleAuth} style={{padding:'12px', width:'250px', marginTop:'10px', background:'#5865f2', color:'white', border:'none', borderRadius:'5px', cursor:'pointer'}}>Login</button>
     </div>
   );
 
@@ -68,10 +79,10 @@ export default function Home() {
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <div style={{ height: "48px", padding: "0 16px", display: "flex", alignItems: "center", borderBottom: "1px solid #232428" }}># {activeServer}</div>
+        <div style={{ height: "48px", padding: "0 16px", display: "flex", alignItems: "center", borderBottom: "1px solid #232428", fontWeight:'bold' }}># {activeServer}</div>
         <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
           {messages.map((m, i) => (
-            <div key={i} style={{ display: "flex", gap: "15px", marginBottom: "20px" }}>
+            <div key={i} style={{ display: "flex", gap: "15px", marginBottom: "20px", borderLeft: m.isAnnounce ? '4px solid #5865f2' : 'none', paddingLeft: m.isAnnounce ? '10px' : '0' }}>
               <img src={m.pfp} style={{ width: "40px", height: "40px", borderRadius: "50%" }} />
               <div>
                 <div style={{ fontWeight: "bold", color: m.isAdmin ? "#f1c40f" : "white" }}>
@@ -83,22 +94,11 @@ export default function Home() {
             </div>
           ))}
         </div>
-        <div style={{ padding: "20px" }}>
-          <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} style={{ width: "100%", padding: "12px", background: "#383a40", border: "none", color: "white", borderRadius: "8px" }} placeholder={`Message #${activeServer}...`} />
+        <div style={{ padding: "20px", position: 'relative' }}>
+          {suggestion && <div style={{ position: 'absolute', top: '-10px', left: '25px', background: '#5865f2', padding: '2px 8px', borderRadius: '4px', fontSize: '11px' }}>{suggestion}</div>}
+          <input value={text} onChange={e => handleInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} style={{ width: "100%", padding: "12px", background: "#383a40", border: "none", color: "white", borderRadius: "8px" }} placeholder={`Message #${activeServer}...`} />
         </div>
       </div>
-
-      {showAcc && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex:100 }}>
-          <div style={{ background: "#313338", padding: "30px", borderRadius: "8px", textAlign:'center' }}>
-            <div style={{fontSize:'10px', color:'#949ba4'}}>COPY THIS ID TO BACKEND:</div>
-            <code style={{color:'#f1c40f', display:'block', margin:'10px 0'}}>{user.uid}</code>
-            <button onClick={() => {localStorage.clear(); window.location.reload();}} style={{color:'#ed4245', background:'none', border:'none', cursor:'pointer'}}>Logout & Reset</button>
-            <br/><br/>
-            <button onClick={() => setShowAcc(false)} style={{background:'#5865f2', color:'white', border:'none', padding:'8px 20px', borderRadius:'4px'}}>Close</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
