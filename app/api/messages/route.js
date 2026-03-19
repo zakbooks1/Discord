@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 
 const client = new MongoClient(process.env.MONGODB_URI);
 
-// --- 1. LOGIN TO THE APP FIRST ---
-// --- 2. COPY YOUR ID FROM SETTINGS ---
-// --- 3. PASTE IT HERE AND REDEPLOY ---
+// --- 1. Login to your app ---
+// --- 2. Copy your ID from the Gear icon ---
+// --- 3. Paste it here and redeploy to get your Crown ---
 const ADMIN_WHITELIST = ["u_3uqqpsixd"]; 
 
 export async function GET(req) {
@@ -17,12 +17,11 @@ export async function GET(req) {
   try {
     await client.connect();
     const db = client.db("chatdb");
-
     const isAdmin = ADMIN_WHITELIST.includes(uid);
-    
-    // Lock the staff-room to everyone except the whitelist
+
+    // Hard block for staff-room
     if (server === "staff-room" && !isAdmin) {
-      return NextResponse.json([{ text: "🛑 Admin Only Area", user: "System", pfp: "", system: true }]);
+      return NextResponse.json([{ text: "🔒 Admin Only", user: "System", pfp: "", system: true }]);
     }
 
     if (type === "servers") {
@@ -33,11 +32,10 @@ export async function GET(req) {
     }
 
     const msgs = await db.collection(server).find().sort({ date: -1 }).limit(50).toArray();
-    
     return NextResponse.json(msgs.map(m => ({
       ...m,
       isAdmin: ADMIN_WHITELIST.includes(m.uid),
-      displayUid: isAdmin ? m.uid : null // Only admins can see user IDs
+      displayUid: isAdmin ? m.uid : null // Only admins see IDs
     })));
   } catch (e) { return NextResponse.json([]); }
 }
@@ -63,23 +61,11 @@ export async function POST(req) {
       return NextResponse.json({ success: true, user: newUser });
     }
 
-    const isAuth = ADMIN_WHITELIST.includes(body.uid);
-    if (body.adminAction && !isAuth) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-
-    // Execute Commands
-    if (body.adminAction) {
-      if (body.action === "clear") await db.collection(body.server).deleteMany({});
-      if (body.action === "ban") await db.collection("blacklist").insertOne({ uid: body.targetUid });
-      if (body.action === "announce") {
-        await db.collection(body.server).insertOne({
-          text: body.text, user: "📢 SYSTEM", pfp: "https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png",
-          uid: "system", isAnnounce: true, date: new Date()
-        });
-        return NextResponse.json({ success: true });
-      }
-    }
+    // Admin Commands
+    if (body.adminAction && !ADMIN_WHITELIST.includes(body.uid)) return NextResponse.json({ error: "No" }, { status: 403 });
+    if (body.adminAction && body.action === "clear") await db.collection(body.server).deleteMany({});
 
     await db.collection(body.server).insertOne({ ...body, date: new Date() });
     return NextResponse.json({ success: true });
-  } catch (e) { return NextResponse.json({ error: "Fail" }, { status: 500 }); }
+  } catch (e) { return NextResponse.json({ error: "Error" }, { status: 500 }); }
 }
