@@ -6,7 +6,7 @@ const client = new MongoClient(process.env.MONGODB_URI);
 // --- 1. Login to your app once ---
 // --- 2. Copy the ID from the Gear settings (e.g., u_3uqqpsixd) ---
 // --- 3. Paste it here to lock the staff room to just you ---
-const ADMIN_WHITELIST = ["u_your_actual_id_here"]; 
+const ADMIN_WHITELIST = ["u_3uqqpsixd"]; 
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
