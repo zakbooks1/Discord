@@ -2,27 +2,41 @@
 import { useState } from "react";
 
 export default function Login({ onAuth }) {
-  const [creds, setCreds] = useState({ name: "", pass: "" });
+  const [name, setName] = useState("");
+  const [pass, setPass] = useState("");
 
-  const submit = async () => {
-    if (!creds.name || !creds.pass) return alert("Missing fields");
-    const res = await fetch("/api/messages", { 
-      method: "POST", 
-      body: JSON.stringify({ action: "auth", user: creds.name, password: creds.pass }) 
+  const handleSubmit = async () => {
+    const res = await fetch("/api/messages", {
+      method: "POST",
+      body: JSON.stringify({ action: "auth", user: name, password: pass })
     });
     const data = await res.json();
-    if (data.success) {
-      localStorage.setItem("v_final_fixed", JSON.stringify(data.user));
-      onAuth(data.user);
-    } else { alert(data.error); }
+    if (data.success) onAuth(data.user);
+    else alert(data.error || "Login failed");
   };
 
   return (
-    <div style={{height:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#1e1f22', color:'white'}}>
-      <h2 style={{marginBottom:'20px'}}>Discord Login</h2>
-      <input placeholder="Username" onChange={e => setCreds({...creds, name: e.target.value})} style={{padding:'12px', margin:'5px', width:'250px', background:'#383a40', color:'white', border:'none', borderRadius:'5px'}} />
-      <input type="password" placeholder="Password" onChange={e => setCreds({...creds, pass: e.target.value})} style={{padding:'12px', margin:'5px', width:'250px', background:'#383a40', color:'white', border:'none', borderRadius:'5px'}} />
-      <button onClick={submit} style={{padding:'12px', width:'250px', marginTop:'10px', background:'#5865f2', color:'white', border:'none', borderRadius:'5px', fontWeight:'bold', cursor:'pointer'}}>Enter</button>
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#313338' }}>
+      <div style={{ background: '#1e1f22', padding: '32px', borderRadius: '8px', width: '400px', textAlign: 'center' }}>
+        <h2 style={{ color: 'white', marginBottom: '20px' }}>Welcome Back!</h2>
+        <input 
+          placeholder="Username" 
+          onChange={e => setName(e.target.value)}
+          style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: 'none', background: '#383a40', color: 'white' }}
+        />
+        <input 
+          type="password" 
+          placeholder="Password" 
+          onChange={e => setPass(e.target.value)}
+          style={{ width: '100%', padding: '10px', marginBottom: '20px', borderRadius: '4px', border: 'none', background: '#383a40', color: 'white' }}
+        />
+        <button 
+          onClick={handleSubmit}
+          style={{ width: '100%', padding: '12px', background: '#5865f2', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+        >
+          Log In
+        </button>
+      </div>
     </div>
   );
 }
