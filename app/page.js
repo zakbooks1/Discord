@@ -1,21 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
+import Login from "../components/Login";
+import { processCommand } from "../lib/cmds";
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [activeServer, setActiveServer] = useState("general");
   const [user, setUser] = useState(null);
-  const [creds, setCreds] = useState({ name: "", pass: "" });
   const [text, setText] = useState("");
+  const [suggestion, setSuggestion] = useState("");
 
   useEffect(() => {
-    // Clear the old 'undefined' data
-    const saved = localStorage.getItem("v_final");
-    if (saved && !saved.includes("undefined")) setUser(JSON.parse(saved));
+    const saved = localStorage.getItem("v_final_fixed");
+    if (saved) setUser(JSON.parse(saved));
   }, []);
 
   const sync = async () => {
-    if (!user) return;
+    if (!user || user.uid === "u_undefined") return;
     const res = await fetch(`/api/messages?server=${activeServer}&uid=${user.uid}`);
     const data = await res.json();
     setMessages(Array.isArray(data) ? data.reverse() : []);
@@ -23,52 +24,68 @@ export default function Home() {
 
   useEffect(() => { sync(); const i = setInterval(sync, 3000); return () => clearInterval(i); }, [user, activeServer]);
 
-  const handleLogin = async () => {
-    const res = await fetch("/api/messages", { method: "POST", body: JSON.stringify({ action: "auth", user: creds.name, password: creds.pass }) });
-    const data = await res.json();
-    if (data.success) {
-      setUser(data.user);
-      localStorage.setItem("v_final", JSON.stringify(data.user));
+  const send = async () => {
+    if (!text.trim()) return;
+    let body = { text, user: user.name, uid: user.uid, pfp: user.pfp, server: activeServer };
+    
+    const cmd = processCommand(text, user, activeServer);
+    if (cmd) {
+      if (cmd.type === "msg") body.text = cmd.text;
+      if (cmd.type === "admin") body = { ...body, ...cmd };
     }
+
+    await fetch("/api/messages", { method: "POST", body: JSON.stringify(body) });
+    setText(""); setSuggestion(""); sync();
   };
 
-  if (!user) return (
-    <div style={{height:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', background:'#1e1f22', color:'white'}}>
-      <h2 style={{marginBottom:'20px'}}>Discord Clone Login</h2>
-      <input placeholder="Username" onChange={e => setCreds({...creds, name: e.target.value})} style={{padding:'10px', margin:'5px', width:'250px', borderRadius:'5px'}} />
-      <input type="password" placeholder="Password" onChange={e => setCreds({...creds, pass: e.target.value})} style={{padding:'10px', margin:'5px', width:'250px', borderRadius:'5px'}} />
-      <button onClick={handleLogin} style={{padding:'10px', width:'250px', background:'#5865f2', color:'white', border:'none', borderRadius:'5px', marginTop:'10px'}}>Sign In</button>
-    </div>
-  );
+  if (!user) return <Login onAuth={setUser} />;
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: "#313338", color: "white", fontFamily: "sans-serif" }}>
+    <div className="flex h-screen bg-[#313338] text-white font-sans">
       {/* Sidebar */}
-      <div style={{ width: "72px", background: "#1e1f22", display: "flex", flexDirection: "column", gap: "10px", padding: "10px" }}>
-        {["general", "staff-room"].map(s => (
-          <div key={s} onClick={() => setActiveServer(s)} style={{ width: "48px", height: "48px", borderRadius: "50%", background: activeServer === s ? "#5865f2" : "#313338", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize:'10px' }}>{s.slice(0,2).toUpperCase()}</div>
+      <div className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-3">
+        {["GEN", "STA", "ANN", "BRU"].map(s => (
+          <div key={s} onClick={() => setActiveServer(s === "STA" ? "staff-room" : s.toLowerCase())} 
+               className={`w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all ${activeServer.includes(s.toLowerCase()) ? "bg-[#5865f2] rounded-2xl" : "bg-[#313338] hover:bg-[#5865f2] hover:rounded-2xl"}`}>
+            {s}
+          </div>
         ))}
       </div>
 
-      {/* Main Chat */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <div style={{ height: "48px", borderBottom: "1px solid #232428", display: "flex", alignItems: "center", padding: "0 15px", fontWeight: "bold" }}># {activeServer}</div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="h-12 border-b border-[#232428] flex items-center px-4 font-bold shadow-sm">
+          # {activeServer}
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((m, i) => (
-            <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
-              <img src={m.pfp} style={{ width: "40px", height: "40px", borderRadius: "50%" }} />
+            <div key={i} className={`flex gap-3 p-2 rounded ${m.isAnnounce ? 'bg-[#5865f2]/10 border-l-4 border-[#5865f2]' : ''}`}>
+              <img src={m.pfp || "https://api.dicebear.com/7.x/bottts/svg?seed=fallback"} className="w-10 h-10 rounded-full bg-[#1e1f22]" />
               <div>
-                <div style={{ fontWeight: "bold", color: m.isAdmin ? "#f1c40f" : "white" }}>
-                  {m.user} {m.isAdmin && "👑"}
-                  {m.displayUid && <span style={{fontSize:'10px', color:'gray', marginLeft:'10px'}}>ID: {m.displayUid}</span>}
+                <div className="flex items-center gap-2">
+                  <span className="font-bold" style={{ color: m.isAdmin ? "#f1c40f" : "white" }}>{m.user}</span>
+                  {m.isAdmin && <span>👑</span>}
+                  {m.displayUid && <span className="text-[10px] text-gray-500">ID: {m.displayUid}</span>}
                 </div>
-                <div>{m.text}</div>
+                <div className="text-[#dbdee1] break-words">{m.text}</div>
               </div>
             </div>
           ))}
         </div>
-        <div style={{ padding: "20px" }}>
-          <input onKeyDown={async e => { if (e.key === "Enter") { await fetch("/api/messages", { method: "POST", body: JSON.stringify({ text: e.target.value, user: user.name, uid: user.uid, pfp: user.pfp, server: activeServer }) }); e.target.value = ""; sync(); } }} style={{ width: "100%", padding: "12px", background: "#383a40", color: "white", border: "none", borderRadius: "8px" }} placeholder={`Message #${activeServer}...`} />
+
+        <div className="p-4 relative">
+          {suggestion && <div className="absolute top-[-30px] left-6 bg-[#5865f2] px-2 py-1 rounded text-xs shadow-lg">{suggestion}</div>}
+          <input 
+            value={text} 
+            onChange={(e) => {
+              setText(e.target.value);
+              const match = ["/clear", "/announce", "/ban", "/shrug", "/dice", "/flip"].find(c => c.startsWith(e.target.value));
+              setSuggestion(match && e.target.value.startsWith("/") ? `Suggest: ${match}` : "");
+            }}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            className="w-full bg-[#383a40] p-3 rounded-lg outline-none focus:ring-2 focus:ring-[#5865f2]"
+            placeholder={`Message #${activeServer}...`}
+          />
         </div>
       </div>
     </div>
