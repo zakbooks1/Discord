@@ -1,102 +1,54 @@
-/* Discord Color Palette */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  --background-darker: #1e1f22;
-  --background-dark: #2b2d31;
-  --background-chat: #313338;
-  --background-input: #383a40;
-  --text-normal: #dbdee1;
+  --bg-main: #313338;
+  --bg-sidebar: #1e1f22;
+  --bg-input: #383a40;
+  --text-main: #dbdee1;
   --text-muted: #949ba4;
-  --blurple: #5865f2;
-  --danger: #ed4245;
-  --success: #23a559;
-  --admin-gold: #f1c40f;
 }
 
-/* Base Setup */
-body, html {
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
   margin: 0;
   padding: 0;
-  background-color: var(--background-darker);
-  color: var(--text-normal);
-  font-family: 'gg sans', 'Noto Sans', sans-serif;
-  overflow: hidden;
-  -webkit-font-smoothing: antialiased;
+  overflow: hidden; /* Prevents the whole page from bouncing on mobile */
 }
 
-/* Custom Scrollbar (iPad/Chrome friendly) */
+/* Custom Discord-style Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
+
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #2b2d31;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: var(--background-darker);
+  background: #1a1b1e;
   border-radius: 10px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #1a1b1e;
+  background: #111214;
 }
 
-/* Staff Room Special Glow */
-.staff-room-active {
-  box-shadow: 0 0 15px rgba(237, 66, 69, 0.3);
-  border: 1px solid var(--danger) !important;
+/* Fix for those image overflows in your screenshot */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
-/* Announcement Animations */
-@keyframes slideIn {
-  from { transform: translateX(-20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+/* Smooth transitions for server icons */
+.server-icon {
+  transition: border-radius 0.2s ease, background-color 0.2s ease;
 }
 
-.announcement-card {
-  animation: slideIn 0.3s ease-out;
-  border-left: 4px solid var(--blurple);
-  background: rgba(88, 101, 242, 0.05);
-  transition: background 0.2s;
-}
-
-.announcement-card:hover {
-  background: rgba(88, 101, 242, 0.1);
-}
-
-/* Avatar Fixes */
-.avatar-img {
-  object-fit: cover;
-  background-color: var(--background-darker);
-  border: 2px solid transparent;
-  transition: border-radius 0.2s, border-color 0.2s;
-}
-
-.avatar-img:hover {
-  border-radius: 12px;
-}
-
-/* Admin ID Code Block */
-code {
-  font-family: monospace;
-  background: #1e1f22;
-  padding: 4px 8px;
-  border-radius: 4px;
-  color: var(--admin-gold);
-  border: 1px solid rgba(241, 196, 15, 0.2);
-}
-
-/* Input Focus */
-input:focus {
-  outline: none;
-}
-
-/* Button Styling */
-button {
-  transition: filter 0.2s, transform 0.1s;
-}
-
-button:active {
-  transform: scale(0.96);
-}
-
-button:hover {
-  filter: brightness(1.1);
+.server-icon:hover {
+  border-radius: 16px;
+  background-color: #5865f2;
 }
