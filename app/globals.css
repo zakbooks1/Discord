@@ -2,26 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Force Dark Mode */
+:root {
+  --bg-main: #313338;
+  --bg-sidebar: #1e1f22;
+  --bg-input: #383a40;
+}
+
 html, body {
-  background-color: #313338 !important;
+  background-color: var(--bg-main) !important;
   color: #f2f3f5 !important;
+  margin: 0;
   height: 100%;
   overflow: hidden;
 }
 
-/* Fix massive images seen in screenshots */
+/* FIX: Scales massive images from screenshots so they don't break the UI */
 img {
-  max-width: 100%;
+  max-width: 300px;
   height: auto;
   border-radius: 8px;
+  margin-top: 5px;
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: #1e1f22;
-  border-radius: 4px;
-}
+/* Custom Discord-style Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #2b2d31; }
+::-webkit-scrollbar-thumb { background: #1a1b1e; border-radius: 10px; }
