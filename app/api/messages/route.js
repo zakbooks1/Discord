@@ -1,8 +1,8 @@
 import { MongoClient } from "mongodb";
 import { NextResponse } from "next/server";
+import { handleCommand } from "@/lib/cmds";
 
 const client = new MongoClient(process.env.MONGODB_URI);
-// Whitelisting your IDs found in Screenshots
 const ADMINS = ["u_3uqqpsixd", "u_ijlemgdr"]; 
 
 export async function POST(req) {
@@ -11,7 +11,7 @@ export async function POST(req) {
     await client.connect();
     const db = client.db("chatdb");
 
-    // Fix for the "u_undefined" issue
+    // --- AUTH LOGIC ---
     if (body.action === "auth") {
       const user = await db.collection("users").findOne({ name: body.user });
       if (user && user.password !== body.password) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,20 +25,53 @@ export async function POST(req) {
     }
 
     const isBoss = ADMINS.includes(body.uid);
+    const powerLevel = isBoss ? 100 : 0;
+
+    // --- COMMAND INTERCEPTOR ---
+    if (body.text && body.text.startsWith("/")) {
+      const result = handleCommand(body.text, { id: body.uid, username: body.user, powerLevel });
+
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 403 });
+      }
+
+      // Handle Database side-effects for commands
+      if (body.text.startsWith("/clear") && isBoss) {
+        await db.collection(body.server || "general").deleteMany({});
+      }
+
+      // Create the system response to show in chat
+      const systemMsg = {
+        text: result.content,
+        user: "SYSTEM",
+        uid: "system",
+        date: new Date(),
+        system: true,
+        color: result.color || "#7289da",
+        pfp: "https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png"
+      };
+
+      await db.collection(body.server || "general").insertOne(systemMsg);
+      return NextResponse.json({ success: true });
+    }
+
+    // --- STANDARD ACTIONS ---
     if (body.adminAction && !isBoss) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     if (body.action === "clear") {
       await db.collection(body.server).deleteMany({});
-    } else if (body.action === "announce") {
-      await db.collection(body.server).insertOne({
-        text: body.text, user: "SYSTEM ANNOUNCEMENT", isAnnounce: true, uid: "system", date: new Date(),
-        pfp: "https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png"
-      });
     } else {
-      await db.collection(body.server || "general").insertOne({ ...body, date: new Date(), isAdmin: isBoss });
+      await db.collection(body.server || "general").insertOne({ 
+        ...body, 
+        date: new Date(), 
+        isAdmin: isBoss 
+      });
     }
+    
     return NextResponse.json({ success: true });
-  } catch (e) { return NextResponse.json({ error: "Error" }, { status: 500 }); }
+  } catch (e) { 
+    return NextResponse.json({ error: "Error" }, { status: 500 }); 
+  }
 }
 
 export async function GET(req) {
@@ -49,7 +82,6 @@ export async function GET(req) {
   const db = client.db("chatdb");
   const isBoss = ADMINS.includes(uid);
 
-  // Secure Staff Room
   if (server === "staff-room" && !isBoss) {
     return NextResponse.json([{ text: "🔒 Access Denied: Staff Only", user: "System", system: true }]);
   }
