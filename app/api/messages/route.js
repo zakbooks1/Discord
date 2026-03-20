@@ -1,6 +1,6 @@
 import { MongoClient } from "mongodb";
 import { NextResponse } from "next/server";
-import { handleCommand } from "@/lib/cmds";
+import { handleCommand } from "/lib/cmds";
 
 const client = new MongoClient(process.env.MONGODB_URI);
 const ADMINS = ["u_3uqqpsixd", "u_ijlemgdr"]; 
