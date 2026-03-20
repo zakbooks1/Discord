@@ -1,14 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
-import Login from "../components/Login";
-import { processCommand } from "../lib/cmds";
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [activeServer, setActiveServer] = useState("general");
   const [user, setUser] = useState(null);
   const [text, setText] = useState("");
-  const [suggestion, setSuggestion] = useState("");
 
   useEffect(() => {
     const saved = localStorage.getItem("v_final_fixed");
@@ -16,7 +13,7 @@ export default function Home() {
   }, []);
 
   const sync = async () => {
-    if (!user || user.uid === "u_undefined") return;
+    if (!user) return;
     const res = await fetch(`/api/messages?server=${activeServer}&uid=${user.uid}`);
     const data = await res.json();
     setMessages(Array.isArray(data) ? data.reverse() : []);
@@ -28,62 +25,62 @@ export default function Home() {
     if (!text.trim()) return;
     let body = { text, user: user.name, uid: user.uid, pfp: user.pfp, server: activeServer };
     
-    const cmd = processCommand(text, user, activeServer);
-    if (cmd) {
-      if (cmd.type === "msg") body.text = cmd.text;
-      if (cmd.type === "admin") body = { ...body, ...cmd };
+    // Quick Command Check
+    if (text.startsWith("/announce ")) {
+      body.adminAction = true;
+      body.action = "announce";
+      body.text = text.replace("/announce ", "");
+    } else if (text === "/clear") {
+      body.adminAction = true;
+      body.action = "clear";
     }
 
     await fetch("/api/messages", { method: "POST", body: JSON.stringify(body) });
-    setText(""); setSuggestion(""); sync();
+    setText(""); sync();
   };
 
-  if (!user) return <Login onAuth={setUser} />;
+  if (!user) return <div className="p-10 text-center">Please login... (Use your Login Component)</div>;
 
   return (
-    <div className="flex h-screen bg-[#313338] text-white font-sans">
+    <div style={{ display: 'flex', height: '100vh', background: '#313338', color: 'white' }}>
       {/* Sidebar */}
-      <div className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-3">
-        {["GEN", "STA", "ANN", "BRU"].map(s => (
-          <div key={s} onClick={() => setActiveServer(s === "STA" ? "staff-room" : s.toLowerCase())} 
-               className={`w-12 h-12 rounded-full flex items-center justify-center cursor-pointer transition-all ${activeServer.includes(s.toLowerCase()) ? "bg-[#5865f2] rounded-2xl" : "bg-[#313338] hover:bg-[#5865f2] hover:rounded-2xl"}`}>
+      <div style={{ width: '72px', background: '#1e1f22', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '12px', gap: '8px' }}>
+        {['GEN', 'STA'].map(s => (
+          <div key={s} onClick={() => setActiveServer(s === 'STA' ? 'staff-room' : 'general')}
+               style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#313338', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             {s}
           </div>
         ))}
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="h-12 border-b border-[#232428] flex items-center px-4 font-bold shadow-sm">
+      {/* Chat Area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ height: '48px', borderBottom: '1px solid #232428', display: 'flex', alignItems: 'center', padding: '0 16px', fontWeight: 'bold' }}>
           # {activeServer}
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
           {messages.map((m, i) => (
-            <div key={i} className={`flex gap-3 p-2 rounded ${m.isAnnounce ? 'bg-[#5865f2]/10 border-l-4 border-[#5865f2]' : ''}`}>
-              <img src={m.pfp || "https://api.dicebear.com/7.x/bottts/svg?seed=fallback"} className="w-10 h-10 rounded-full bg-[#1e1f22]" />
+            <div key={i} style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+              <img src={m.pfp} style={{ width: '40px', height: '40px', borderRadius: '50%' }} alt="pfp" />
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold" style={{ color: m.isAdmin ? "#f1c40f" : "white" }}>{m.user}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontWeight: 'bold', color: m.isAdmin ? '#f1c40f' : 'white' }}>{m.user}</span>
                   {m.isAdmin && <span>👑</span>}
-                  {m.displayUid && <span className="text-[10px] text-gray-500">ID: {m.displayUid}</span>}
+                  {m.displayUid && <span style={{ fontSize: '10px', color: '#949ba4' }}>ID: {m.displayUid}</span>}
                 </div>
-                <div className="text-[#dbdee1] break-words">{m.text}</div>
+                <div style={{ color: '#dbdee1' }}>{m.text}</div>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="p-4 relative">
-          {suggestion && <div className="absolute top-[-30px] left-6 bg-[#5865f2] px-2 py-1 rounded text-xs shadow-lg">{suggestion}</div>}
+        <div style={{ padding: '16px' }}>
           <input 
             value={text} 
-            onChange={(e) => {
-              setText(e.target.value);
-              const match = ["/clear", "/announce", "/ban", "/shrug", "/dice", "/flip"].find(c => c.startsWith(e.target.value));
-              setSuggestion(match && e.target.value.startsWith("/") ? `Suggest: ${match}` : "");
-            }}
+            onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
-            className="w-full bg-[#383a40] p-3 rounded-lg outline-none focus:ring-2 focus:ring-[#5865f2]"
+            style={{ width: '100%', background: '#383a40', color: 'white', padding: '12px', borderRadius: '8px', border: 'none', outline: 'none' }}
             placeholder={`Message #${activeServer}...`}
           />
         </div>
